@@ -23,6 +23,7 @@ class CUTModel(BaseModel):
 
         parser.add_argument('--lambda_GAN', type=float, default=1.0, help='weight for GAN loss：GAN(G(X))')
         parser.add_argument('--lambda_NCE', type=float, default=1.0, help='weight for NCE loss: NCE(G(X), X)')
+        parser.add_argument('--lambda_idt',type=float,default=10.0,help='weight for idt loss
         parser.add_argument('--nce_idt', type=util.str2bool, nargs='?', const=True, default=False, help='use NCE loss for identity mapping: NCE(G(Y), Y))')
         parser.add_argument('--nce_layers', type=str, default='0,4,8,12,16', help='compute NCE loss on which layers')
         parser.add_argument('--nce_includes_all_negatives_from_minibatch',
@@ -175,9 +176,12 @@ class CUTModel(BaseModel):
         """Calculate GAN and NCE loss for the generator"""
         fake = self.fake_B
         # First, G(A) should fake the discriminator
-        if self.opt.lambda_GAN > 0.0:
+        if self.opt.lambda_GAN and self.opt.lambda_idt > 0.0:
             pred_fake = self.netD(fake)
             self.loss_G_GAN = self.criterionGAN(pred_fake, True).mean() * self.opt.lambda_GAN
+            self.loss_idt  = self.criterionIdt(self.fake_B,self.real_B)* self.opt.lambda_idt
+            self.loss_G     = self.loss_G_GAN + self.loss_idt          
+                            
         else:
             self.loss_G_GAN = 0.0
 
@@ -192,7 +196,7 @@ class CUTModel(BaseModel):
         else:
             loss_NCE_both = self.loss_NCE
 
-        self.loss_G = self.loss_G_GAN + loss_NCE_both
+        self.loss_G =  self.loss_G + loss_NCE_both
         return self.loss_G
 
     def calculate_NCE_loss(self, src, tgt):
